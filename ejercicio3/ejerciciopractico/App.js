@@ -1,29 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, ActivityIndicator, View, FlatList, Button } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, ActivityIndicator, View, FlatList, Image } from 'react-native';
 import axios from 'axios';
 
-const JOKE_API_URL = 'https://v2.jokeapi.dev/joke/Any?lang=es';
+const POKE_API_URL = 'https://pokeapi.co/api/v2/pokemon?limit=20'; // Limitar a 20 Pokémon para la demostración
 
 export default function App() {
-  const [jokes, setJokes] = useState([]);
+  const [pokemons, setPokemons] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchJoke();
+    fetchPokemons();
   }, []);
 
-  const fetchJoke = async () => {
+  const fetchPokemons = async () => {
     try {
-      const response = await axios.get(JOKE_API_URL);
-      const data = response.data;
+      const response = await axios.get(POKE_API_URL);
+      const data = response.data.results;
 
-      if (data.type === 'single') {
-        setJokes((prevJokes) => [...prevJokes, { joke: data.joke }]);
-      } else if (data.type === 'twopart') {
-        setJokes((prevJokes) => [...prevJokes, { joke: `${data.setup}\n\n${data.delivery}` }]);
-      }
+      // Obtener detalles de cada Pokémon
+      const pokemonDetails = await Promise.all(data.map(async (pokemon) => {
+        const detailResponse = await axios.get(pokemon.url);
+        return detailResponse.data;
+      }));
+
+      setPokemons(pokemonDetails);
     } catch (error) {
-      console.error('Error al cargar la broma:', error);
+      console.error('Error al cargar los Pokémon:', error);
     } finally {
       setLoading(false);
     }
@@ -34,18 +36,16 @@ export default function App() {
       {loading ? (
         <ActivityIndicator size="large" color="#00ff00" />
       ) : (
-        <>
-          <FlatList
-            data={jokes}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.jokeContainer}>
-                <Text style={styles.joke}>{item.joke}</Text> {/* Asegúrate de que cada broma esté dentro de <Text> */}
-              </View>
-            )}
-          />
-          <Button title="Agregar Broma" onPress={fetchJoke} />
-        </>
+        <FlatList
+          data={pokemons}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.pokemonContainer}>
+              <Image source={{ uri: item.sprites.front_default }} style={styles.pokemonImage} />
+              <Text style={styles.pokemonName}>{item.name}</Text>
+            </View>
+          )}
+        />
       )}
     </SafeAreaView>
   );
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  jokeContainer: {
+  pokemonContainer: {
     marginBottom: 16,
     padding: 10,
     borderWidth: 1,
@@ -67,8 +67,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#fff',
     width: '100%',
+    alignItems: 'center',
   },
-  joke: {
+  pokemonImage: {
+    width: 100,
+    height: 100,
+  },
+  pokemonName: {
     fontSize: 18,
     textAlign: 'center',
     lineHeight: 24,
